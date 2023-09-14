@@ -21,6 +21,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -54,8 +55,8 @@ public class DisPatchservlet extends HttpServlet {
 		String typeName = o.getDeclaringClass().getTypeName();
 		Object o1 = map.get(typeName);
 		try {
-			ArrayList<Object> objects = getParams(req, resp, o);
-			o.invoke(o1,objects.toArray());
+			Object[] objects = getParams(req, resp, o);
+			o.invoke(o1,objects);
 		} catch (IllegalAccessException e) {
 			e.printStackTrace();
 		} catch (InvocationTargetException e) {
@@ -67,7 +68,7 @@ public class DisPatchservlet extends HttpServlet {
 		resp.setStatus(200);
 	}
 
-	private ArrayList<Object> getParams(HttpServletRequest req, HttpServletResponse resp, Method o) {
+	private Object[] getParams(HttpServletRequest req, HttpServletResponse resp, Method o) {
 		ArrayList<Object> objects = new ArrayList<>();
 		Parameter[] parameters = o.getParameters();
 		for (Parameter parameter : parameters) {
@@ -80,16 +81,17 @@ public class DisPatchservlet extends HttpServlet {
 					String s = parameterMap.get(value)[0];
 					objects.add(s);
 				}
-			} else if (type == HttpServletRequest.class ){
+			} else if (type == HttpServletRequest.class) {
 				objects.add(req);
-			}else if (type == HttpServletResponse.class ){
+			} else if (type == HttpServletResponse.class) {
 				objects.add(resp);
 			}
-
-
 		}
-		return objects;
+
+		Object[] objects2 = objects.toArray(new Object[0]);
+		return objects2;
 	}
+
 
 	@Override
 	protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
@@ -148,20 +150,21 @@ public class DisPatchservlet extends HttpServlet {
 	}
 
 	public static void main(String[] args) throws ClassNotFoundException {
-		Class<?> aClass = Class.forName("com.dc.controller.DccController");
-		Field[] declaredFields = aClass.getDeclaredFields();
-		for (Field declaredField : declaredFields) {
-			System.out.println(declaredField.getType().getName());
-			System.out.println(declaredField.getName());
-		}
-		System.out.println(aClass.getName());
-		DisPatchservlet disPatchservlet = new DisPatchservlet();
-		disPatchservlet.doScan("com.dc");
-		System.out.println("1111");
+//		Class<?> aClass = Class.forName("com.dc.controller.DccController");
+//		Field[] declaredFields = aClass.getDeclaredFields();
+//		for (Field declaredField : declaredFields) {
+//			System.out.println(declaredField.getType().getName());
+//			System.out.println(declaredField.getName());
+//		}
+//		System.out.println(aClass.getName());
+//		DisPatchservlet disPatchservlet = new DisPatchservlet();
+//		disPatchservlet.doScan("com.dc");
+//		System.out.println("1111");
 	}
 
 	private void doScan(String path) {
 		URL resource = this.getClass().getResource(("/" + path.replaceAll("\\.", "/")).replaceAll("/+", "/"));
+		System.out.println(resource);
 		File file = new File(resource.getFile());
 		for (File file1 : file.listFiles()) {
 			if (file1.isDirectory()) {
@@ -177,6 +180,10 @@ public class DisPatchservlet extends HttpServlet {
 						String typeName = aClass.getTypeName();
 						if (aClass.isAnnotationPresent(DcService.class)) {
 							Object o = aClass.newInstance();
+							Class<?>[] interfaces = aClass.getInterfaces();
+							for (int i = 0; i < interfaces.length; i++) {
+								map.put(interfaces[i].getTypeName(),o);
+							}
 							DcService annotation = aClass.getAnnotation(DcService.class);
 							if ("".equals(annotation.value())) {
 //								map.put(path+"."+tolowFirst(name1), o);
@@ -196,8 +203,8 @@ public class DisPatchservlet extends HttpServlet {
 								if (method.isAnnotationPresent(DcRequestMapping.class)) {
 									DcRequestMapping annotation = method.getAnnotation(DcRequestMapping.class);
 									baseurl += annotation.value()[0];
+									map1.put(baseurl, method);
 								}
-								map1.put(baseurl, method);
 							}
 							Object o = aClass.newInstance();
 							DcController annotation = aClass.getAnnotation(DcController.class);
