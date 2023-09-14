@@ -4,9 +4,22 @@
 
 <web-app>
   <display-name>Archetype Created Web Application</display-name>
-<!--  <servlet-mapping>-->
-<!--    <servlet-name>web-spring-1.0</servlet-name>-->
-<!--    <url-pattern>/servlet</url-pattern>-->
-<!--  </servlet-mapping>-->
+
+  <servlet>
+<!--    指定servlet 名称 处理器-->
+    <servlet-name>dcmvc</servlet-name>
+    <servlet-class>com.dc.DisPatchservlet</servlet-class>
+    <init-param>
+      <param-name>contextConfigLocation</param-name>
+      <param-value>application.properties</param-value>
+    </init-param>
+
+    <load-on-startup>1</load-on-startup>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>dcmvc</servlet-name>
+    <url-pattern>/*</url-pattern>
+<!--    servlet url 映射器-->
+  </servlet-mapping>
 </web-app>
 
