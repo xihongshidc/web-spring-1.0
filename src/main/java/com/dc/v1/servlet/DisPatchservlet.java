@@ -1,4 +1,4 @@
-package com.dc;
+package com.dc.v1.servlet;
 
 import com.dc.annotation.DcAutowired;
 import com.dc.annotation.DcController;
@@ -47,11 +47,20 @@ public class DisPatchservlet extends HttpServlet {
 		String requestURI = req.getRequestURI();
 		System.out.println(requestURI);
 		System.out.println("进来了 ..");
-		if (!map1.keySet().contains(requestURI)) {
+		//RequestMaping
+		String url = requestURI.replaceAll("/+", "/");
+		if (!map1.containsKey(url)) {
 			resp.setStatus(404);
-			resp.getWriter().print(" 404 Not Found ! ");
+			resp.getWriter().print("<html>\n" +
+					"<body>\n" +
+					"<h2>404 </h2>\n" +
+					"<p>   Not Found !!!</p>\n" +
+					"</body>\n" +
+					"</html> ");
+			return;
 		}
-		Method o = map1.get(requestURI);
+
+		Method o = map1.get(url);
 		String typeName = o.getDeclaringClass().getTypeName();
 		Object o1 = map.get(typeName);
 		try {
@@ -61,9 +70,10 @@ public class DisPatchservlet extends HttpServlet {
 			e.printStackTrace();
 		} catch (InvocationTargetException e) {
 			e.printStackTrace();
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
 
-		resp.setContentType("text/plain;charset=utf-8");
 		resp.getWriter().print("结束  ... . ");
 		resp.setStatus(200);
 	}
@@ -74,22 +84,40 @@ public class DisPatchservlet extends HttpServlet {
 		for (Parameter parameter : parameters) {
 			Class<?> type = parameter.getType();
 			if (type == String.class) {
-				if (parameter.isAnnotationPresent(DcRequestParam.class)) {
-					DcRequestParam annotation = parameter.getAnnotation(DcRequestParam.class);
-					String value = annotation.value();
-					Map<String, String[]> parameterMap = req.getParameterMap();
-					String s = parameterMap.get(value)[0];
-					objects.add(s);
-				}
+				String param = getParam(req, parameter);
+				objects.add(param);
 			} else if (type == HttpServletRequest.class) {
 				objects.add(req);
 			} else if (type == HttpServletResponse.class) {
 				objects.add(resp);
+			} else if (type == Integer.class){
+				String param = getParam(req, parameter);
+				if (param != null){
+					Integer integer = Integer.valueOf(param);
+					objects.add(integer);
+				}else {
+					objects.add(param);
+				}
 			}
 		}
 
 		Object[] objects2 = objects.toArray(new Object[0]);
 		return objects2;
+	}
+
+	private String getParam(HttpServletRequest req, Parameter parameter) {
+		String s = null;
+		if (parameter.isAnnotationPresent(DcRequestParam.class)) {
+			DcRequestParam annotation = parameter.getAnnotation(DcRequestParam.class);
+			String value = annotation.value();
+			Map<String, String[]> parameterMap = req.getParameterMap();
+
+			if(parameterMap.containsKey(value)){//判断是否有值
+				s = Arrays.toString(parameterMap.get(value)).replaceAll("\\[|\\]","");
+
+			}
+		}
+		return s;
 	}
 
 
@@ -129,6 +157,7 @@ public class DisPatchservlet extends HttpServlet {
 		for (String s : keySet) {
 			Object o = map.get(s);
 			Class<?> aClass = o.getClass();
+			//获取到所有的字段， 包括private protected default
 			for (Field declaredField : aClass.getDeclaredFields()) {
 				if (declaredField.isAnnotationPresent(DcAutowired.class)) {
 					DcAutowired annotation = declaredField.getAnnotation(DcAutowired.class);
@@ -150,20 +179,36 @@ public class DisPatchservlet extends HttpServlet {
 	}
 
 	public static void main(String[] args) throws ClassNotFoundException {
-//		Class<?> aClass = Class.forName("com.dc.controller.DccController");
-//		Field[] declaredFields = aClass.getDeclaredFields();
-//		for (Field declaredField : declaredFields) {
-//			System.out.println(declaredField.getType().getName());
-//			System.out.println(declaredField.getName());
-//		}
-//		System.out.println(aClass.getName());
-//		DisPatchservlet disPatchservlet = new DisPatchservlet();
-//		disPatchservlet.doScan("com.dc");
+		Class<?> aClass = Class.forName("com.dc.controller.DccController");
+		Field[] declaredFields = aClass.getDeclaredFields();
+		for (Field declaredField : declaredFields) {
+			System.out.println(declaredField.getType().getName());
+			System.out.println(declaredField.getName());
+		}
+		System.out.println(aClass.getName());
+		DisPatchservlet disPatchservlet = new DisPatchservlet();
+		disPatchservlet.doScan("com.dc");
 //		System.out.println("1111");
+//		Integer integer = Integer.valueOf(null);
+
+		String[] st={"1","2","3"};
+		System.out.println(Arrays.toString(st).replaceAll("\\[|\\]","").replaceAll(",","").replaceAll("\\s+",""));
+		int i= 1;
+		for (int i1 = 0; i1 < 10; i1++) {
+
+			if (i==1){
+				System.out.println(1);
+				continue;
+			} else if (i==2){
+				System.out.println(2);
+			}
+		}
+
+//		System.out.println(integer);
 	}
 
 	private void doScan(String path) {
-		URL resource = this.getClass().getResource(("/" + path.replaceAll("\\.", "/")).replaceAll("/+", "/"));
+		URL resource = this.getClass().getResource(("/" + path.replaceAll("\\.", "/")));
 		System.out.println(resource);
 		File file = new File(resource.getFile());
 		for (File file1 : file.listFiles()) {
@@ -177,6 +222,7 @@ public class DisPatchservlet extends HttpServlet {
 					name1 = name1.replace(".class", "");
 					try {
 						Class<?> aClass = Class.forName(path + "." + name1);
+						System.out.println(aClass.getSimpleName());
 						String typeName = aClass.getTypeName();
 						if (aClass.isAnnotationPresent(DcService.class)) {
 							Object o = aClass.newInstance();
@@ -202,8 +248,8 @@ public class DisPatchservlet extends HttpServlet {
 							for (Method method : methods) {
 								if (method.isAnnotationPresent(DcRequestMapping.class)) {
 									DcRequestMapping annotation = method.getAnnotation(DcRequestMapping.class);
-									baseurl += annotation.value()[0];
-									map1.put(baseurl, method);
+									String url= baseurl +annotation.value()[0];
+									map1.put(url, method);
 								}
 							}
 							Object o = aClass.newInstance();

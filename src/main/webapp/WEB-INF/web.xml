@@ -1,19 +1,21 @@
-<!DOCTYPE web-app PUBLIC
- "-//Sun Microsystems, Inc.//DTD Web Application 2.3//EN"
- "http://java.sun.com/dtd/web-app_2_3.dtd" >
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="http://java.sun.com/xml/ns/j2ee"
+         xsi:schemaLocation="http://java.sun.com/xml/ns/j2ee http://java.sun.com/xml/ns/j2ee/web-app_2_4.xsd"
+         version="2.4">
+<!--    XSD（XML Schema Definition）文件是一种用于定义XML文档结构和内容的规范的文件。    -->
 
-<web-app>
   <display-name>Archetype Created Web Application</display-name>
-
+<!--web 容器加载 标签顺序 ,    ServletContext -> context-param -> listener -> filter -> servlet -->
   <servlet>
 <!--    指定servlet 名称 处理器-->
     <servlet-name>dcmvc</servlet-name>
-    <servlet-class>com.dc.DisPatchservlet</servlet-class>
+    <servlet-class>com.dc.v2.servlet.DisPatchservlet</servlet-class>
     <init-param>
       <param-name>contextConfigLocation</param-name>
       <param-value>application.properties</param-value>
     </init-param>
-
+<!-- 标签的主要属性是整数值，它表示Servlet的加载顺序 值越小加载顺序早，-->
     <load-on-startup>1</load-on-startup>
   </servlet>
   <servlet-mapping>
@@ -21,5 +23,6 @@
     <url-pattern>/*</url-pattern>
 <!--    servlet url 映射器-->
   </servlet-mapping>
+
 </web-app>
 
