@@ -1,4 +1,4 @@
-package com.dc.v2.servlet;
+package com.dc.v3.servlet;
 
 import com.dc.annotation.DcAutowired;
 import com.dc.annotation.DcController;
@@ -36,24 +36,27 @@ public class DisPatchservlet extends HttpServlet {
 	//读取默认配置文件的 信息
 	private Properties properties = new Properties();
 
+	//扫描的类名
 	private List<String> classpaths = new ArrayList<>();
 
+	//bean 实例对象
 	private HashMap<String, Object> ioc = new HashMap<>();
 
-	private HashMap<String, Method> HandlerMapping = new HashMap<>();
+	//	private HashMap<String, Method> HandlerMapping = new HashMap<>();
+	private List<HandlerMapping> handlerMapping = new ArrayList<>();
 
 	//  执行阶段入口，
 	@Override
 	protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-		this.doPost(req,resp);
+		this.doPost(req, resp);
 	}
 
 	@Override
 	protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
 		System.out.println("请求进来了 ...");
-		String requestURI = req.getRequestURI();
-		String key = requestURI.replaceAll("/+", "/");
-		if (!HandlerMapping.containsKey(key)){
+
+		HandlerMapping methodByUrl = this.getMethodByUrl(req);
+		if (methodByUrl == null) {
 			resp.getWriter().print("<html>\n" +
 					"<body>\n" +
 					"<h2>404 </h2>\n" +
@@ -65,11 +68,11 @@ public class DisPatchservlet extends HttpServlet {
 		}
 
 		try {
-			Method method = HandlerMapping.get(key);
-			String simpleName = method.getDeclaringClass().getSimpleName();
-			Object o = ioc.get(simpleName);
-			Object[] params = getParams(req, resp, method);
-			method.invoke(o,params);
+			Method method = methodByUrl.getMethod();
+			//获取到的对象.
+			Object controller = methodByUrl.getController();
+			Object[] params = getParams(req, resp, methodByUrl);
+			method.invoke(controller, params);
 		} catch (IllegalAccessException e) {
 			e.printStackTrace();
 		} catch (InvocationTargetException e) {
@@ -79,11 +82,24 @@ public class DisPatchservlet extends HttpServlet {
 
 	}
 
-	private Object[] getParams(HttpServletRequest req, HttpServletResponse resp, Method o) {
+	private HandlerMapping getMethodByUrl(HttpServletRequest req) {
+		String requestURI = req.getRequestURI();
+		String key = requestURI.replaceAll("/+", "/");
+		for (HandlerMapping mapping : handlerMapping) {
+			if (mapping.getUrl().equals(key)) {
+				return mapping;
+			}
+
+		}
+		return null;
+	}
+
+	private Object[] getParams(HttpServletRequest req, HttpServletResponse resp, HandlerMapping handlerMapping) {
 		ArrayList<Object> objects = new ArrayList<>();
-		Parameter[] parameters = o.getParameters();
+		Parameter[] parameters = handlerMapping.getParameter();
 		for (Parameter parameter : parameters) {
 			Class<?> type = parameter.getType();
+			//这个应该是可以优化的  todo
 			if (type == String.class) {
 				String param = getParam(req, parameter);
 				objects.add(param);
@@ -91,12 +107,12 @@ public class DisPatchservlet extends HttpServlet {
 				objects.add(req);
 			} else if (type == HttpServletResponse.class) {
 				objects.add(resp);
-			} else if (type == Integer.class){
+			} else if (type == Integer.class) {
 				String param = getParam(req, parameter);
-				if (param != null){
+				if (param != null) {
 					Integer integer = Integer.valueOf(param);
 					objects.add(integer);
-				}else {
+				} else {
 					objects.add(param);
 				}
 			}
@@ -112,8 +128,8 @@ public class DisPatchservlet extends HttpServlet {
 			DcRequestParam annotation = parameter.getAnnotation(DcRequestParam.class);
 			String value = annotation.value();
 			Map<String, String[]> parameterMap = req.getParameterMap();
-			if(parameterMap.containsKey(value)){//判断是否有值
-				s = Arrays.toString(parameterMap.get(value)).replaceAll("\\[|\\]","").replaceAll(",","").replaceAll("\\s+","");
+			if (parameterMap.containsKey(value)) {//判断是否有值
+				s = Arrays.toString(parameterMap.get(value)).replaceAll("\\[|\\]", "").replaceAll(",", "").replaceAll("\\s+", "");
 			}
 		}
 		return s;
@@ -138,30 +154,29 @@ public class DisPatchservlet extends HttpServlet {
 		doInject();
 
 		//5.初始化组件，HandlerMapping
-		registerRequestMapping();
+		registerHandlerMapping();
 
 		System.out.println("执行完成......");
 
 	}
 
-	private void registerRequestMapping() {
+	private void registerHandlerMapping() {
 		try {
 			for (String classpath : classpaths) {
 				Class<?> aClass = Class.forName(classpath);
 				String base = "";
-				if (aClass.isAnnotationPresent(DcRequestMapping.class)){
+				if (aClass.isAnnotationPresent(DcRequestMapping.class)) {
 					DcRequestMapping annotation = aClass.getAnnotation(DcRequestMapping.class);
 					base = annotation.value()[0];
 				}
 				Method[] methods = aClass.getMethods();
 				for (Method method : methods) {
-					if (!method.isAnnotationPresent(DcRequestMapping.class)){
+					if (!method.isAnnotationPresent(DcRequestMapping.class)) {
 						continue;
 					}
 					DcRequestMapping annotation = method.getAnnotation(DcRequestMapping.class);
-					String url =("/" + base +"/" +annotation.value()[0]).replaceAll("/+","/");
-					HandlerMapping.put(url,method);
-
+					String url = ("/" + base + "/" + annotation.value()[0]).replaceAll("/+", "/");
+					handlerMapping.add(new HandlerMapping(method, url, ioc.get(aClass.getSimpleName())));
 				}
 			}
 		} catch (ClassNotFoundException e) {
@@ -170,6 +185,7 @@ public class DisPatchservlet extends HttpServlet {
 
 	}
 
+	//依赖注入
 	private void doInject() {
 		try {
 			for (String classpath : classpaths) {
@@ -196,20 +212,20 @@ public class DisPatchservlet extends HttpServlet {
 		for (String classpath : classpaths) {
 			try {
 				Class<?> aClass = Class.forName(classpath);
-				if (aClass.isAnnotationPresent(DcController.class)||aClass.isAnnotationPresent(DcRepository.class)){
+				if (aClass.isAnnotationPresent(DcController.class) || aClass.isAnnotationPresent(DcRepository.class)) {
 					Object o = aClass.newInstance();
-					ioc.put(aClass.getSimpleName(),o); //注册的时候可以根据驼峰命名发将首字符小写,
-				}else if (aClass.isAnnotationPresent(DcService.class)){
+					ioc.put(aClass.getSimpleName(), o); //注册的时候可以根据驼峰命名发将首字符小写,
+				} else if (aClass.isAnnotationPresent(DcService.class)) {
 					Class<?>[] interfaces = aClass.getInterfaces();
 					Object o = aClass.newInstance();
 					for (Class<?> anInterface : interfaces) {
-						if (ioc.containsKey(aClass.getTypeName())){
-							throw new IllegalArgumentException("接口类型 " +anInterface.getTypeName()+"已存在");
-						}else{
-							ioc.put(anInterface.getTypeName(),o);
+						if (ioc.containsKey(aClass.getTypeName())) {
+							throw new IllegalArgumentException("接口类型 " + anInterface.getTypeName() + "已存在");
+						} else {
+							ioc.put(anInterface.getTypeName(), o);
 						}
 					}
-					ioc.put(aClass.getSimpleName(),o);//注册的时候可以根据驼峰命名发将首字符小写,
+					ioc.put(aClass.getSimpleName(), o);//注册的时候可以根据驼峰命名发将首字符小写,
 				}
 			} catch (ClassNotFoundException e) {
 				e.printStackTrace();
@@ -218,22 +234,21 @@ public class DisPatchservlet extends HttpServlet {
 			} catch (InstantiationException e) {
 				e.printStackTrace();
 			}
-
 		}
 	}
 
 	private void doScan(String scanPackage) {
-		 //包名
+		//包名
 		URL resource = this.getClass().getClassLoader().getResource(scanPackage);
 		File file = new File(resource.getFile());
 		for (File listFile : file.listFiles()) {
 			String name = listFile.getName();
 			System.out.println(name);
-			if (listFile.isDirectory()){
-				doScan(scanPackage+"/"+name);
-			}else if (name.endsWith(".class")){
+			if (listFile.isDirectory()) {
+				doScan(scanPackage + "/" + name);
+			} else if (name.endsWith(".class")) {
 				//记录需要的类名字, 方便后面反射创建实例对象.
-				classpaths.add((scanPackage+"/"+name.replace(".class","")).replaceAll("/+","\\."));
+				classpaths.add((scanPackage + "/" + name.replace(".class", "")).replaceAll("/+", "\\."));
 			}
 
 		}
@@ -241,7 +256,7 @@ public class DisPatchservlet extends HttpServlet {
 
 	private void doinit(ServletConfig config) {
 		String contextConfigLocation = config.getInitParameter("contextConfigLocation");
-		try (InputStream resourceAsStream = this.getClass().getClassLoader().getResourceAsStream(contextConfigLocation)){
+		try (InputStream resourceAsStream = this.getClass().getClassLoader().getResourceAsStream(contextConfigLocation)) {
 			properties.load(resourceAsStream);      //加载配置信息.
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -251,7 +266,7 @@ public class DisPatchservlet extends HttpServlet {
 
 	public static void main(String[] args) {
 
-		String x = Arrays.toString(new String[]{"1", "@33", "ccc"}).replaceAll("\\[|\\]", "").replaceAll(",", "").replaceAll("\\s+","");
+		String x = Arrays.toString(new String[]{"1", "@33", "ccc"}).replaceAll("\\[|\\]", "").replaceAll(",", "").replaceAll("\\s+", "");
 		System.out.println(x);
 	}
 }

@@ -10,7 +10,7 @@
   <servlet>
 <!--    指定servlet 名称 处理器-->
     <servlet-name>dcmvc</servlet-name>
-    <servlet-class>com.dc.v2.servlet.DisPatchservlet</servlet-class>
+    <servlet-class>com.dc.v3.servlet.DisPatchservlet</servlet-class>
     <init-param>
       <param-name>contextConfigLocation</param-name>
       <param-value>application.properties</param-value>

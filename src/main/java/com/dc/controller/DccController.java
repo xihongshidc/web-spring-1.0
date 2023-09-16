@@ -48,5 +48,18 @@ public class DccController {
 			e.printStackTrace();
 		}
 	}
+
+
+	@DcRequestMapping("/sub")
+	public void sub(HttpServletRequest request, HttpServletResponse response , @DcRequestParam("add") Integer name,String age){
+		String print = dcDemoService.print(String.valueOf(name+age));
+		System.out.println(print);
+		try {
+			response.setContentType("text/plain;charset=utf-8");
+			response.getWriter().print(true);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
 }
 
